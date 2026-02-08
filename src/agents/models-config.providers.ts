@@ -551,12 +551,15 @@ export async function resolveImplicitProviders(params: {
     providers.moonshot = { ...buildMoonshotProvider(), apiKey: moonshotKey };
   }
 
-  const nexosKey =
-    resolveEnvApiKeyVarName("nexos") ??
-    resolveApiKeyFromProfiles({ provider: "nexos", store: authStore });
-  if (nexosKey) {
-    const models = await discoverNexosModels(nexosKey);
-    providers.nexos = { ...buildNexosProvider(models), apiKey: nexosKey };
+  const nexosEnv = resolveEnvApiKey("nexos");
+  const nexosApiKey =
+    nexosEnv?.apiKey ?? resolveApiKeyFromProfiles({ provider: "nexos", store: authStore });
+  const nexosKeyRef = nexosEnv
+    ? resolveEnvApiKeyVarName("nexos")
+    : nexosApiKey;
+  if (nexosApiKey && nexosKeyRef) {
+    const models = await discoverNexosModels(nexosApiKey);
+    providers.nexos = { ...buildNexosProvider(models), apiKey: nexosKeyRef };
   }
 
   const syntheticKey =
