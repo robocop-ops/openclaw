@@ -47,6 +47,14 @@ const NEXOS_DEFAULT_COST = {
   cacheWrite: 0,
 };
 
+type NexosModelRecord = {
+  nexos_model_id?: string;
+  id?: string;
+  name?: string;
+  model?: string;
+  modality?: string | string[];
+};
+
 const XIAOMI_BASE_URL = "https://api.xiaomimimo.com/anthropic";
 export const XIAOMI_DEFAULT_MODEL_ID = "mimo-v2-flash";
 const XIAOMI_DEFAULT_CONTEXT_WINDOW = 262144;
@@ -354,22 +362,65 @@ function buildMoonshotProvider(): ProviderConfig {
   };
 }
 
-function buildNexosProvider(): ProviderConfig {
+function buildNexosProvider(models?: ModelDefinitionConfig[]): ProviderConfig {
   return {
     baseUrl: NEXOS_BASE_URL,
     api: "openai-completions",
-    models: [
-      {
-        id: NEXOS_DEFAULT_MODEL_ID,
-        name: "Nexos Default",
-        reasoning: false,
-        input: ["text"],
-        cost: NEXOS_DEFAULT_COST,
-        contextWindow: NEXOS_DEFAULT_CONTEXT_WINDOW,
-        maxTokens: NEXOS_DEFAULT_MAX_TOKENS,
-      },
-    ],
+    models:
+      models && models.length > 0
+        ? models
+        : [
+            {
+              id: NEXOS_DEFAULT_MODEL_ID,
+              name: "Nexos Default",
+              reasoning: false,
+              input: ["text"],
+              cost: NEXOS_DEFAULT_COST,
+              contextWindow: NEXOS_DEFAULT_CONTEXT_WINDOW,
+              maxTokens: NEXOS_DEFAULT_MAX_TOKENS,
+            },
+          ],
   };
+}
+
+async function discoverNexosModels(apiKey: string): Promise<ModelDefinitionConfig[]> {
+  try {
+    const response = await fetch(`${NEXOS_BASE_URL}/models`, {
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) {
+      console.warn(`Failed to discover Nexos models: ${response.status}`);
+      return [];
+    }
+    const payload = (await response.json()) as {
+      data?: NexosModelRecord[];
+      models?: NexosModelRecord[];
+    };
+    const list = payload.data ?? payload.models ?? [];
+    return list
+      .map((item) => {
+        const id = item.nexos_model_id ?? item.id ?? item.model;
+        if (!id) {
+          return null;
+        }
+        return {
+          id,
+          name: item.name ?? id,
+          reasoning: false,
+          input: ["text"],
+          cost: NEXOS_DEFAULT_COST,
+          contextWindow: NEXOS_DEFAULT_CONTEXT_WINDOW,
+          maxTokens: NEXOS_DEFAULT_MAX_TOKENS,
+        } satisfies ModelDefinitionConfig;
+      })
+      .filter((item): item is ModelDefinitionConfig => Boolean(item));
+  } catch (err) {
+    console.warn(`Failed to discover Nexos models: ${String(err)}`);
+    return [];
+  }
 }
 
 function buildQwenPortalProvider(): ProviderConfig {
@@ -504,7 +555,8 @@ export async function resolveImplicitProviders(params: {
     resolveEnvApiKeyVarName("nexos") ??
     resolveApiKeyFromProfiles({ provider: "nexos", store: authStore });
   if (nexosKey) {
-    providers.nexos = { ...buildNexosProvider(), apiKey: nexosKey };
+    const models = await discoverNexosModels(nexosKey);
+    providers.nexos = { ...buildNexosProvider(models), apiKey: nexosKey };
   }
 
   const syntheticKey =

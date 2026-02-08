@@ -45,5 +45,6 @@ point OpenClaw at your Nexos Gateway base URL.
 
 ## Notes
 
-- Replace `<model-id>` with the Nexos model ID you want to expose.
+- Replace `<model-id>` with the Nexos `nexos_model_id` you want to expose.
+- You can also discover models dynamically via `GET /v1/models` and use the returned `nexos_model_id` values.
 - If Nexos issues OAuth tokens, prefer a provider auth plugin to mint bearer tokens and store them in auth profiles.
