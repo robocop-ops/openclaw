@@ -406,11 +406,22 @@ async function discoverNexosModels(apiKey: string): Promise<ModelDefinitionConfi
         if (!id) {
           return null;
         }
+        const modality = item.modality;
+        const inputs: Array<"text" | "image"> = ["text"];
+        if (Array.isArray(modality)) {
+          if (modality.includes("image")) {
+            inputs.push("image");
+          }
+        } else if (typeof modality === "string") {
+          if (modality.toLowerCase().includes("image")) {
+            inputs.push("image");
+          }
+        }
         return {
           id,
           name: item.name ?? id,
           reasoning: false,
-          input: ["text"],
+          input: inputs,
           cost: NEXOS_DEFAULT_COST,
           contextWindow: NEXOS_DEFAULT_CONTEXT_WINDOW,
           maxTokens: NEXOS_DEFAULT_MAX_TOKENS,
